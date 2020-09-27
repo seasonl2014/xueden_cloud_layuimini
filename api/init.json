@@ -1,0 +1,15 @@
+{
+  "clearInfo": {
+    "clearUrl": "api/clear.json"
+  },
+  "homeInfo": {
+    "title": "首页",
+    "icon": "fa fa-home",
+    "href": "page/welcome.html?mpi=m-p-i-0"
+  },
+  "logoInfo": {
+    "title": "后台管理",
+    "image": "images/logo.png",
+    "href": ""
+  }
+}

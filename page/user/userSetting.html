@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>基本资料</title>
+    <meta name="renderer" content="webkit">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <link rel="stylesheet" href="../../lib/layui-v2.5.5/css/layui.css" media="all">
+    <link rel="stylesheet" href="../../css/public.css" media="all">
+    <style>
+        .layui-form-item .layui-input-company {width: auto;padding-right: 10px;line-height: 38px;}
+    </style>
+</head>
+<body>
+<div class="layuimini-container">
+    <div class="layuimini-main">
+
+        <form class="layui-form layuimini-form" lay-filter="formUser">
+            <div class="layui-form-item">
+                <label class="layui-form-label required">用户名</label>
+                <div class="layui-input-block">
+                    <input type="text" name="loginName" lay-verify="required" disabled lay-reqtext="管理账号不能为空" placeholder="请输入管理账号"  value="" class="layui-input layui-disabled">
+                    <tip>填写自己登录账号的名称。</tip>
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">昵称</label>
+                <div class="layui-input-block">
+                    <input type="text" value="" name="nickName" class="layui-input">
+                </div>
+            </div>
+
+            <div class="layui-form-item">
+                <label class="layui-form-label">手机</label>
+                <div class="layui-input-block">
+                    <input type="tel" name="tel" lay-verify="required" lay-reqtext="手机不能为空" placeholder="请输入手机"  value="" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">邮箱</label>
+                <div class="layui-input-block">
+                    <input type="email" name="email"  placeholder="请输入邮箱"  value="" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item layui-form-text">
+                <label class="layui-form-label">自我介绍</label>
+                <div class="layui-input-block">
+                    <textarea name="remarks" class="layui-textarea" placeholder="请输入自我介绍"></textarea>
+                </div>
+            </div>
+
+            <div class="layui-form-item" style="margin-left: 5%;">
+                <div class="layui-input-block">
+                    <button class="layui-btn" lay-submit="" lay-filter="changeUser">立即提交</button>
+                    <button type="button" class="layui-btn layui-btn-primary restuserinfo">重置</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+<script src="../../lib/layui-v2.5.5/layui.js" charset="utf-8"></script>
+<script src="../../js/lay-config.js?v=1.0.4" charset="utf-8"></script>
+<script src="../../api/baseApi.js" charset="utf-8"></script>
+<script src="../../api/userApi.js" charset="utf-8"></script>
+<script>
+    layui.use(['form','layuimini'], function () {
+        var form = layui.form,
+            layer = layui.layer,
+            $ = layui.$,
+            layuimini = layui.layuimini,
+           delFlage = true;
+
+        // 获取token
+        let loginUserData = layui.sessionData('loginUserData');
+        console.log("loginUserData",loginUserData.access_token)
+
+        //ajax全局参数设置
+        $.ajaxSetup({
+            headers:{
+                Authorization: 'Bearer '+loginUserData.access_token
+            },
+            // 发送cookie
+            xhrFields: {
+                withCredentials: true
+            }
+        });
+
+        //获取列表页传过来的角色数据
+        let localDate = layui.sessionData('loginUserData');
+        console.info("---------"+localDate.loginUser);
+        delFlage = !localDate.loginUser.delFlag;
+        //给表单赋值
+        form.val("formUser", {
+            "id":localDate.loginUser.id
+            ,"loginName": localDate.loginUser.loginName
+            ,"nickName": localDate.loginUser.nickName
+            ,"tel": localDate.loginUser.tel
+            ,"email": localDate.loginUser.email
+            ,"delFlag": delFlage
+        });
+
+        //监听提交
+        form.on('submit(changeUser)', function (data) {
+            let loadIndex = layer.load(2, {
+                shade: [0.3, '#333']
+            });
+            $.ajax({
+                type:"POST",
+                url:saveUserinfoUrl,
+                dataType:"json",
+                data:data.field,
+                xhrFields:{withCredentials: true},
+                success:function(res){
+                    layer.close(loadIndex);
+                    if(res.success){
+                        parent.layer.msg("用户修改成功!",{time:1500},function(){
+                            //刷新父页面
+                            parent.location.reload();
+                        });
+                    }else{
+                        layer.msg(res.message);
+                    }
+                }
+            });
+            /*var index = layer.alert(JSON.stringify(data.field), {
+                title: '最终的提交信息'
+            }, function () {
+                layer.close(index);
+                layuimini.closeCurrentTab();
+            });*/
+            return false;
+        });
+
+    });
+</script>
+</body>
+</html>

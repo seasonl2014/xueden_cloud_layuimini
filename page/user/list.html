@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>layui</title>
+    <meta name="renderer" content="webkit">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <link rel="stylesheet" href="../../lib/layui-v2.5.5/css/layui.css" media="all">
+    <link rel="stylesheet" href="../../css/public.css" media="all">
+</head>
+<body>
+<div class="layuimini-container">
+    <div class="layuimini-main">
+
+        <fieldset class="table-search-fieldset">
+            <legend>搜索信息</legend>
+            <div style="margin: 10px 10px 10px 10px">
+                <form class="layui-form layui-form-pane" action="">
+                    <div class="layui-form-item">
+                        <div class="layui-inline">
+                            <label class="layui-form-label">关键词</label>
+                            <div class="layui-input-inline">
+                                <input type="text" name="s_key" autocomplete="off" placeholder="可以输入登录名/邮箱/手机号" class="layui-input">
+                            </div>
+                        </div>
+
+
+                        <div class="layui-inline">
+                            <a  class="layui-btn layui-btn-primary" lay-submit  lay-filter="searchForm"><i class="layui-icon"></i> 搜 索</a>
+                            <button type="reset" class="layui-btn layui-btn-primary">重置</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </fieldset>
+
+        <script type="text/html" id="toolbarDemo">
+          <div class="layui-btn-container">
+              <a class="layui-btn layui-btn-sm layui-btn-normal" data-type="add">添加用户</a>
+              <a class="layui-btn layui-btn-sm layui-btn-danger" data-type="deleteSome">批量删除</a>
+          </div>
+        </script>
+
+        <table class="layui-hide" id="userTableId" lay-filter="currentTableFilter"></table>
+
+        <script type="text/html" id="userStatus">
+            {{#  if(d.delFlag == false){ }}
+            <span class="layui-badge layui-bg-green">正常</span>
+            {{#  } else { }}
+            <span class="layui-badge layui-bg-gray">停用</span>
+            {{#  } }}
+        </script>
+
+        <script type="text/html" id="currentTableBar">
+        <a class="layui-btn layui-btn-xs data-count-edit layui-btn-radius" lay-event="edit">编辑</a>
+        <a class="layui-btn layui-btn-xs layui-btn-danger data-count-delete layui-btn-radius" lay-event="delete">删除</a>
+    </script>
+
+    </div>
+</div>
+<script src="../../lib/layui-v2.5.5/layui.js" charset="utf-8"></script>
+<script src="../../api/baseApi.js" charset="utf-8"></script>
+<script src="../../api/userApi.js" charset="utf-8"></script>
+<script type="text/javascript" src="../../js/tools.js"></script>
+<script>
+    layui.use(['form', 'table'], function () {
+        var $ = layui.jquery,
+            form = layui.form,
+            table = layui.table,
+            layuimini = layui.layuimini;
+        //ajax全局参数设置
+        // 获取token
+        let loginUserData = layui.sessionData('loginUserData');
+        console.log("loginUserData",loginUserData.access_token)
+
+        //ajax全局参数设置
+        $.ajaxSetup({
+            headers:{
+                Authorization: 'Bearer '+loginUserData.access_token
+            },
+            // 发送cookie
+            xhrFields: {
+                withCredentials: true
+            }
+        });
+
+
+         table.render({
+            elem: '#userTableId',
+            url: listUrl,
+             method:'post',
+            toolbar: '#toolbarDemo',
+            defaultToolbar: ['filter', 'exports', 'print', {
+                title: '提示',
+                layEvent: 'LAYTABLE_TIPS',
+                icon: 'layui-icon-tips'
+            }],
+             text: {
+                none: '暂无相关数据或者您无此权限'
+             },
+            cols: [[
+                {type: "checkbox", width: 50, fixed: "left"},
+                {field: 'id', width: 80, title: 'ID', sort: true},
+                {field:'loginName', title: '登录名称'},
+                {field:'nickName',  title: '昵称',    width:'10%'},
+                {field:'email',     title: '邮箱',    width:'16%' },
+                {field:'tel',       title: '电话',    width:'12%'},
+                {field:'locked',    title: '会员状态',width:'12%',templet:'#userStatus'},
+                {field:'createDate',  title: '创建时间',    width:'14%',templet:'<div>{{ layui.laytpl.toDateString(d.createDate) }}</div>',unresize: true}, //单元格内容水平居中
+                {field:'updateDate',  title: '修改时间',    width:'14%',templet:'<div>{{ layui.laytpl.toDateString(d.updateDate) }}</div>',unresize: true}, //单元格内容水平居中
+                {title: '操作', minWidth: 50, templet: '#currentTableBar', fixed: "right", align: "center"}
+
+            ]],
+            limits: [10, 15, 20, 25, 50, 100],
+            limit: 15,
+            page: true
+        });
+
+         //功能按钮
+        const active = {
+          add: function () {
+              addIndex = layer.open({
+                  title : "添加用户",
+                  type : 2,
+                  content: '../user/add.html',
+                  success : function(layero, addIndex){
+                      setTimeout(function(){
+                          layer.tips('点击此处返回角色列表', '.layui-layer-setwin .layui-layer-close', {
+                              tips: 3
+                          });
+                      },500);
+                  }
+              });
+
+              //改变窗口大小时，重置弹窗的高度，防止超出可视区域（如F12调出debug的操作）
+              $(window).resize(function(){
+                  layer.full(addIndex);
+              });
+              layer.full(addIndex);
+          },
+            //批量删除
+            deleteSome: function () {
+                var checkStatus = table.checkStatus('userTableId'),
+                    data = checkStatus.data;
+                 if(data.length>0){
+
+                     layer.confirm("你确定要删除这些用户么？",{btn: ['是的,我确定', '我再想想']},
+                     function () {
+                         $.post({
+                             url: deleteSomeUrl,
+                             data:JSON.stringify(data),
+                             dataType: "json",
+                             contentType:"application/json",
+                             timeout:300000,
+                             xhrFields:{withCredentials: true},
+                             success: function (res) {
+                                 if(res.success){
+                                     layer.msg("删除成功", {time: 1000}, function () {
+                                         table.reload('userTableId', table);
+                                     });
+                                 }else{
+                                     layer.msg(res.message);
+                                 }
+                             },
+                             error: function (res) {
+                                 layer.msg(res.message);
+                             }
+                         });
+                     })
+
+                 }else{
+                     layer.msg("请选择需要删除的用户", {time: 1000});
+                 }
+            }
+        };
+
+        $('.layui-btn-container .layui-btn').on('click', function(){
+            var type = $(this).data('type');
+            active[type] ? active[type].call(this) : '';
+        });
+
+
+        // 监听搜索操作
+        form.on('submit(searchForm)', function (data) {
+            table.where = data.field;
+            table.reload('userTableId', table);
+            return false;
+        });
+
+        // 监听添加操作
+        $(".data-add-btn").on("click", function () {
+
+            var index = layer.open({
+                title: '添加用户',
+                type: 2,
+                shade: 0.2,
+                maxmin:true,
+                shadeClose: true,
+                area: ['100%', '100%'],
+                content: '/page/table/add.html',
+            });
+            $(window).on("resize", function () {
+                layer.full(index);
+            });
+
+            return false;
+        });
+
+        // 监听删除操作
+        $(".data-delete-btn").on("click", function () {
+            var checkStatus = list.checkStatus('currentTableId')
+                , data = checkStatus.data;
+            layer.alert(JSON.stringify(data));
+        });
+
+        //监听表格复选框选择
+        table.on('checkbox(currentTableFilter)', function (obj) {
+            console.log(obj)
+        });
+
+        table.on('tool(currentTableFilter)', function (obj) {
+            let data = obj.data;
+            if (obj.event === 'edit') {
+                layui.sessionData('userData',{
+                    key: 'user'
+                    ,value: data
+                });
+
+                let index = layer.open({
+                    title: '编辑用户',
+                    type: 2,
+                    shade: 0.2,
+                    maxmin:true,
+                    shadeClose: true,
+                    area: ['100%', '100%'],
+                    content: '../user/edit.html',
+                    success : function(layero, index){
+                        setTimeout(function(){
+                            layer.tips('点击此处返回用户列表', '.layui-layer-setwin .layui-layer-close', {
+                                tips: 3
+                            });
+                        },500);
+                    }
+                });
+                $(window).on("resize", function () {
+                    layer.full(index);
+                });
+                return false;
+            } else if (obj.event === 'delete') {
+                layer.confirm('你确定要删除该用户么？',{btn:['是的,我确定','我再想想']}, function (index) {
+                    $.post({
+                        url: deleteUrl,
+                        data: {id: data.id},
+                        dataType: "json",
+                        timeout:300000,
+                        xhrFields:{withCredentials: true},
+                        success: function (res) {
+                            if(res.success){
+                                layer.msg("删除成功", {time: 1000}, function () {
+                                    table.reload('userTableId', table);
+                                });
+                            }else{
+                                layer.msg(res.message);
+                            }
+                        },
+                        error: function (res) {
+                            layer.msg(res.message);
+                        }
+
+                    });
+                });
+            }
+        });
+
+    });
+</script>
+<script>
+
+</script>
+
+</body>
+</html>

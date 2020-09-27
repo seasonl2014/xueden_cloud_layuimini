@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>layui</title>
+    <meta name="renderer" content="webkit">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <link rel="stylesheet" href="../../lib/layui-v2.5.5/css/layui.css" media="all">
+    <link rel="stylesheet" href="../../css/public.css" media="all">
+    <style>
+        body {
+            background-color: #ffffff;
+        }
+
+        .layui-form-item .layui-inline{ min-width:15%; float:left; margin-right:0; }
+        .layui-form-item .role-box {
+            position: relative;
+        }
+    </style>
+</head>
+<body>
+<form  class="layui-form layuimini-form" lay-filter="formUser">
+
+    <div class="layui-form-item">
+        <input name="id" type="hidden" value="">
+        <label class="layui-form-label required">登录名</label>
+        <div class="layui-input-block">
+            <input type="text" class="layui-input" name="loginName" lay-verify="required" placeholder="请输入登录名">
+            <tip>填写自己管理账号的名称。</tip>
+        </div>
+    </div>
+
+    <div class="layui-form-item">
+        <label class="layui-form-label required">昵称</label>
+        <div class="layui-input-block">
+            <input type="text" class="layui-input" name="nickName" placeholder="请输入昵称">
+        </div>
+    </div>
+
+
+    <div class="layui-form-item">
+        <label class="layui-form-label required">手机</label>
+        <div class="layui-input-block">
+            <input type="number" name="tel" lay-verify="required" lay-reqtext="手机不能为空" placeholder="请输入手机" value="" class="layui-input">
+        </div>
+    </div>
+
+    <div class="layui-form-item">
+        <label class="layui-form-label required">邮箱</label>
+        <div class="layui-input-block">
+            <input type="text" class="layui-input" name="email" lay-verify="email" placeholder="请输入邮箱">
+        </div>
+    </div>
+
+    <div class="layui-form-item">
+        <label class="layui-form-label">用户角色</label>
+        <div class="layui-input-block role-box">
+            <div class="jq-role-inline">
+                <fieldset class="layui-elem-field">
+                    <legend>选择角色</legend>
+                    <div class="layui-field-box layui-header-role" >
+
+                    </div>
+                </fieldset>
+            </div>
+        </div>
+    </div>
+
+    <div class="layui-form-item">
+        <label class="layui-form-label required">是否启用</label>
+        <div class="layui-input-block">
+            <input type="checkbox" name="delFlag" lay-skin="switch"  lay-filter="delFlag"  lay-text="启用|停用" checked>
+        </div>
+    </div>
+
+    <div class="layui-form-item">
+        <div class="layui-input-block">
+            <button class="layui-btn" lay-submit="" lay-filter="addUser">立即提交</button>
+            <button type="reset" class="layui-btn layui-btn-primary">重置</button>
+        </div>
+    </div>
+</form>
+<script src="../../lib/layui-v2.5.5/layui.js" charset="utf-8"></script>
+<script src="../../api/baseApi.js" charset="utf-8"></script>
+<script src="../../api/userApi.js" charset="utf-8"></script>
+<script>
+
+    Array.prototype.contains = function ( needle ) {
+        for (i in this) {
+            if (this[i] == needle) return true;
+        }
+        return false;
+    };
+    layui.use(['form','element'], function () {
+        let form = layui.form,
+            layer = layui.layer,
+            element = layui.element,
+            $ = layui.$,
+            delFlage = true;
+
+        // 获取token
+        let loginUserData = layui.sessionData('loginUserData');
+        console.log("loginUserData",loginUserData.access_token)
+
+        //ajax全局参数设置
+        $.ajaxSetup({
+            headers:{
+                Authorization: 'Bearer '+loginUserData.access_token
+            },
+            // 发送cookie
+            xhrFields: {
+                withCredentials: true
+            }
+        });
+        //获取列表页传过来的角色数据
+        let localDate = layui.sessionData('userData');
+        delFlage = !localDate.user.delFlag;
+        //给表单赋值
+        form.val("formUser", {
+            "id":localDate.user.id
+            ,"loginName": localDate.user.loginName
+            ,"nickName": localDate.user.nickName
+            ,"tel": localDate.user.tel
+            ,"email": localDate.user.email
+            ,"delFlag": delFlage
+        });
+        //获取所有菜单数据
+        function getRolesByUser(){
+            $.get({
+                url: getRolesByUserUrl,
+                dataType: "json",
+                timeout:300000,
+                xhrFields:{withCredentials: true},
+                data: {id:localDate.user.id},
+                success: function (res) {
+                    if(res.success){
+                        initRole(res.data);
+                    }else{
+                        layer.msg(res.message);
+                    }
+                },
+                error: function () {
+
+                }
+            });
+        }
+        getRolesByUser();
+
+        //初始化角色
+        function initRole(data){
+            let roleHtml = '';
+            let roleIdsArr=data.roleIds.split(",");
+            //遍历菜单data
+            $.each(data.roleList, function (index, role) {
+                if(roleIdsArr.contains(role.id)) {
+                    roleHtml += '<input type="checkbox" name="roles" checked value="' + role.id + '" title="' + role.name + '" lay-filter="role" />\n';
+                }else {
+                    roleHtml += '<input type="checkbox" name="roles"  value="' + role.id + '" title="' + role.name + '" lay-filter="role" />\n';
+                }
+            });
+
+            $('.layui-header-role').html(roleHtml);
+            //重新渲染
+            form.render('checkbox');
+        }
+
+        //监听提交
+        form.on('submit(addUser)', function (data) {
+            if(data.field.id == null){
+                layer.msg("用户ID不存在");
+                return false;
+            }
+
+
+
+            //给角色赋值
+            delete data.field["roles"];
+            let selectRole = [];
+            $('input[name="roles"]:checked').each(function(){
+                selectRole.push({"id":$(this).val()});
+            });
+            data.field.roleLists = selectRole;
+            //判断用户是否启用
+            if(undefined !== data.field.delFlag && null != data.field.delFlag){
+                data.field.delFlag = false;
+            }else{
+                data.field.delFlag = true;
+            }
+
+            let loadIndex = layer.load(2, {
+                shade: [0.3, '#333']
+            });
+
+            $.post({
+                url: editUrl,
+                data:JSON.stringify(data.field),
+                dataType: "json",
+                timeout:300000,
+                contentType:"application/json",
+                xhrFields:{withCredentials: true},
+                success: function (res) {
+                    layer.close(loadIndex);
+                    if(res.success){
+                        parent.layer.msg("用户编辑成功！",{time:1000},function(){
+                            //刷新父页面
+                            parent.location.reload();
+                        });
+                    }else{
+                        layer.msg(res.message);
+                    }
+                },
+                error: function () {
+
+                }
+
+            });
+            return false;
+        });
+
+    });
+</script>
+</body>
+</html>

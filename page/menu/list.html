@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>layui</title>
+    <meta name="renderer" content="webkit">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <link rel="stylesheet" href="../../lib/layui-v2.5.5/css/layui.css" media="all">
+    <link rel="stylesheet" href="../../css/public.css" media="all">
+    <style>
+        .layui-btn:not(.layui-btn-lg ):not(.layui-btn-sm):not(.layui-btn-xs) {
+            height: 34px;
+            line-height: 34px;
+            padding: 0 8px;
+        }
+        .layui-badge {
+            height: 20px;
+            line-height: 19px;
+            box-sizing: border-box;
+        }
+        .layui-badge-green {
+            color: #52c41a;
+            background: #f6ffed;
+            border: 1px solid #b7eb8f;
+        }
+        .layui-badge-blue {
+            color: #1890ff;
+            background: #e6f7ff;
+            border: 1px solid #91d5ff;
+        }
+
+        .layui-badge-warm {
+            color: #009688;
+            background: #e6f7ff;
+            border: 1px solid #4cffb3;
+        }
+    </style>
+</head>
+<body>
+<div class="layuimini-container">
+    <div class="layuimini-main">
+        <div class="layui-btn-group">
+            <button class="layui-btn" id="btn-expand">全部展开</button>
+            <button class="layui-btn" id="btn-fold">全部折叠</button>
+            <button class="layui-btn layui-btn-normal" data-type="addPmenu">添加父菜单</button>
+        </div>
+
+        <table class="layui-table" id="menueTreeTable" lay-filter="munu-table"></table>
+    </div>
+</div>
+<!--操作列-->
+<script type="text/html" id="auth-state">
+<a class="layui-btn layui-btn-sm layui-btn-radius" lay-event="addChild">添加子菜单</a>
+<a class="layui-btn layui-btn-warm layui-btn-sm layui-btn-radius" lay-event="edit">编辑</a>
+<a class="layui-btn layui-btn-danger layui-btn-sm layui-btn-radius" lay-event="del">删除</a>
+</script>
+
+<script src="../../lib/layui-v2.5.5/layui.js" charset="utf-8"></script>
+<script src="../../js/lay-config.js?v=1.0.4" charset="utf-8"></script>
+<script src="../../api/baseApi.js" charset="utf-8"></script>
+<script src="../../api/menusApi.js" charset="utf-8"></script>
+<script>
+    layui.use(['layer','util', 'treeTable','laytpl'], function () {
+        var $ = layui.jquery;
+        var layer = layui.layer;
+        var laytpl = layui.laytpl;
+        var treetable = layui.treeTable;
+        var util = layui.util;
+
+        // 获取token
+        let loginUserData = layui.sessionData('loginUserData');
+        console.log("loginUserData",loginUserData.access_token)
+
+        //ajax全局参数设置
+        $.ajaxSetup({
+            headers:{
+                Authorization: 'Bearer '+loginUserData.access_token
+            },
+            // 发送cookie
+            xhrFields: {
+                withCredentials: true
+            }
+        });
+
+        //渲染表格
+        let insTb = treetable.render({
+            elem: '#menueTreeTable',
+            text: {
+                none: '<div style="padding: 18px 0;">暂无数据或您没权限查看~</div>'
+            },
+            tree: {
+                iconIndex: 2,  // 折叠图标显示在第几列
+                idName: 'id',  // 自定义id字段的名称
+                pidName: 'pid',  // 自定义标识是否还有子节点的字段名称
+                haveChildName: 'haveChild',  // 自定义标识是否还有子节点的字段名称
+                isPidData: true  // 是否是pid形式数据
+            },
+            cols: [
+                {type: 'numbers', title: '序号', width: 80},
+                {field: 'id', title: 'ID', width: 80},
+                {field: 'name', title: '菜单名称', width: 260},
+                {field: 'permission', title: '权限标识', width: 210},
+                {field: 'href', title: '菜单URL', width: 200},
+                {field: 'icon', title: '图标', width: 140},
+                {field: 'sort', title: '排序', width: 80},
+                {
+                    field: 'isMenu', width: 120, align: 'center', templet: function (d) {
+                        if (d.isMenu === 1) {
+                            return '<span class="layui-badge layui-badge-warm">按钮</span>';
+                        }
+                        if (d.isMenu === -1) {
+                            return '<span class="layui-badge layui-badge-blue">目录</span>';
+                        } else {
+                            return '<span class="layui-badge layui-badge-green">菜单</span>';
+                        }
+                    }, title: '类型'
+                },
+                {field: 'createDate', title: '创建时间', width: 180},
+                {align: 'center', toolbar: '#auth-state', title: '操作', width: 260}
+            ],
+            reqData: function(data,callback) {
+            // 在这里写ajax请求，通过callback方法回调数据
+                $.post({
+                    url: listUrl,
+                    dataType: "json",
+                    timeout:300000,
+                    success: function (res) {
+                        if(res.code===1){
+                            callback([]);
+                        }else{
+                            callback(res.data);
+                        }
+                    }
+                });
+            },
+            style: 'margin-top:0;'
+        });
+
+
+        // 全部展开
+        $('#btn-expand').click(function () {
+            insTb.expandAll();
+        });
+
+        // 全部折叠
+        $('#btn-fold').click(function () {
+            insTb.foldAll();
+        });
+
+        //监听工具条
+        treetable.on('tool(menueTreeTable)',function (obj) {
+            let data = obj.data;
+            let  layEvent = obj.event;
+            if(layEvent==='addChild'){//添加子菜单
+                layui.sessionData('childMenuData', {
+                    key: 'childMenu'
+                    ,value: data
+                });
+
+                let index = layer.open({
+                    title: '添加子菜单',
+                    type: 2,
+                    shade: 0.2,
+                    maxmin:true,
+                    shadeClose: true,
+                    area: ['100%', '100%'],
+                    content: '../menu/addchild.html',
+                    success : function(layero, index){
+                        setTimeout(function(){
+                            layer.tips('点击此处返回菜单列表', '.layui-layer-setwin .layui-layer-close', {
+                                tips: 3
+                            });
+                        },500);
+                    }
+                });
+
+                $(window).on("resize", function () {
+                    layer.full(index);
+                });
+                return false;
+
+            } else if(layEvent==='edit'){//编辑菜单
+                layui.sessionData('menuData',{
+                    key: 'menu'
+                    ,value: data
+                });
+
+                let index = layer.open({
+                    title: '编辑菜单',
+                    type: 2,
+                    shade: 0.2,
+                    maxmin:true,
+                    shadeClose: true,
+                    area: ['100%', '100%'],
+                    content: '../menu/edit.html',
+                    success : function(layero, index){
+                        setTimeout(function(){
+                            layer.tips('点击此处返回菜单列表', '.layui-layer-setwin .layui-layer-close', {
+                                tips: 3
+                            });
+                        },500);
+                    }
+                });
+            }else  if(layEvent==='del'){//删除菜单
+                layer.confirm("你确定要删除该菜单么？这将会使得其下的所有子菜单都删除",{btn:['是的,我确定','我再想想']},
+                function () {
+                    let loadIndex = layer.load(2, {
+                        shade: [0.3, '#333']
+                    });
+
+                    $.post({
+                        url: deleteUrl,
+                        data:{"id":data.id},
+                        dataType: "json",
+                        timeout:300000,
+                        xhrFields:{withCredentials: true},
+                        success: function (res) {
+                            layer.close(loadIndex);
+                            if(res.success){
+                                layer.msg("删除成功",{time: 1000},function(){
+                                    location.reload();
+                                });
+                            }else{
+                                layer.msg(res.message);
+                            }
+                        },
+                        error: function () {
+
+                        }
+                    });
+                });
+            }
+
+        });
+
+        let active = {
+            addPmenu: function () {
+                let addIndex = layer.open({
+                    title : "添加父菜单",
+                    type : 2,
+                    content: '../menu/addparent.html',
+                    success : function(layero, addIndex){
+                        setTimeout(function(){
+                            layer.tips('点击此处返回菜单列表', '.layui-layer-setwin .layui-layer-close', {
+                                tips: 3
+                            });
+                        },500);
+                    }
+                });
+                //改变窗口大小时，重置弹窗的高度，防止超出可视区域（如F12调出debug的操作）
+                $(window).resize(function(){
+                    layer.full(addIndex);
+                });
+                layer.full(addIndex);
+
+            }
+
+        }
+
+        $('.layui-btn-group .layui-btn').on('click',function () {
+             let type = $(this).data('type');
+             active[type] ? active[type].call(this) : '';
+        });
+
+    });
+</script>
+<script>
+
+</script>
+
+</body>
+</html>
